@@ -4,7 +4,7 @@ import requests
 API_URL = "http://127.0.0.1:8000"
 
 st.set_page_config(
-    page_title="Synaptica",
+    page_title="Synaptica Pro",
     page_icon="🧠",
     layout="wide",
 )
@@ -12,123 +12,299 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    .main-title {
-        font-size: 48px;
-        font-weight: 800;
-        background: linear-gradient(90deg, #667eea, #764ba2);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+    .stApp { background: #F7F5F0; }
+    .hero {
+        padding: 4rem 2rem;
+        border-radius: 24px;
+        background: linear-gradient(135deg, #FFFFFF, #EEF2FF);
+        border: 1px solid #E5E7EB;
     }
-    .sub {
-        font-size: 18px;
-        color: #666;
+    .title { font-size: 56px; font-weight: 800; color: #1F2937; }
+    .subtitle { font-size: 20px; color: #6B7280; max-width: 760px; }
+    .card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 18px;
+        border: 1px solid #E5E7EB;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.04);
     }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-st.markdown('<div class="main-title">🧠 Synaptica</div>', unsafe_allow_html=True)
-st.markdown(
-    '<div class="sub">Self-Evolving Multi-Agent Intelligence Platform</div>',
-    unsafe_allow_html=True,
-)
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
 
-st.sidebar.header("📊 System Status")
+if "page" not in st.session_state:
+    st.session_state.page = "Home"
 
-try:
-    health = requests.get(f"{API_URL}/health", timeout=5).json()
-    st.sidebar.success("Backend Connected")
-    st.sidebar.metric("Agents Active", health.get("agents", 5))
-except Exception:
-    st.sidebar.error("Backend Not Connected")
-    st.sidebar.info("Run: python -m uvicorn api.main:app --reload")
 
-st.sidebar.header("🤖 Agents")
-try:
-    agents = requests.get(f"{API_URL}/agents", timeout=5).json()["agents"]
-    for agent in agents:
-        st.sidebar.write(f"✅ {agent['name']}")
-except Exception:
-    st.sidebar.write("Agents unavailable")
+def landing_page():
+    st.markdown(
+        """
+        <div class="hero">
+            <div class="title">🧠 Synaptica Pro</div>
+            <p class="subtitle">
+                Premium AI workflow platform for research, document intelligence,
+                and multi-agent execution.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-st.header("🎯 Enter Your Task")
+    st.write("")
 
-examples = [
-    "Launch Synaptica AI Platform",
-    "Plan a product launch for an AI study planner",
-    "Create a go-to-market strategy for a fitness app",
-]
+    col1, col2, col3 = st.columns(3)
 
-selected = st.selectbox("Choose example task", examples)
+    with col1:
+        st.markdown(
+            '<div class="card"><h3>🤖 Multi-Agent AI</h3><p>Specialized agents collaborate to plan, research, analyze, and synthesize outputs.</p></div>',
+            unsafe_allow_html=True,
+        )
 
-task_input = st.text_area(
-    "Task",
-    value=selected,
-    height=120,
-)
+    with col2:
+        st.markdown(
+            '<div class="card"><h3>📚 Document Intelligence</h3><p>Upload PDFs, index them, and ask grounded questions using RAG.</p></div>',
+            unsafe_allow_html=True,
+        )
 
-if st.button("🚀 Execute Multi-Agent Workflow", type="primary"):
-    if not task_input.strip():
-        st.warning("Please enter a task.")
+    with col3:
+        st.markdown(
+            '<div class="card"><h3>📄 Reports</h3><p>Generate structured execution reports from agent workflows and document context.</p></div>',
+            unsafe_allow_html=True,
+        )
+
+    st.write("")
+
+    if st.button("Get Started", type="primary"):
+        st.session_state.page = "Login"
+        st.rerun()
+
+
+def login_page():
+    st.title("Welcome back")
+    st.caption("Login to access your Synaptica workspace.")
+
+    with st.form("login_form"):
+        email = st.text_input("Email")
+        password = st.text_input("Password", type="password")
+        submit = st.form_submit_button("Login", type="primary")
+
+    if submit:
+        if email and password:
+            st.session_state.logged_in = True
+            st.session_state.page = "Dashboard"
+            st.success("Login successful")
+            st.rerun()
+        else:
+            st.error("Please enter email and password.")
+
+
+def dashboard_page():
+    with st.sidebar:
+        st.title("Synaptica Pro")
+
+        page = st.radio(
+            "Workspace",
+            [
+                "🏠 Overview",
+                "📚 Knowledge Base",
+                "🤖 Agent Studio",
+                "⚡ Workflows",
+                "📊 Analytics",
+                "📄 Reports",
+                "⚙️ Settings",
+            ],
+        )
+
+        st.markdown("---")
+
+        if st.button("Logout"):
+            st.session_state.logged_in = False
+            st.session_state.page = "Home"
+            st.rerun()
+
+    if page == "🏠 Overview":
+        st.title("Dashboard Overview")
+
+        try:
+            health = requests.get(f"{API_URL}/health", timeout=5).json()
+            st.success("Backend Connected")
+            st.metric("Agents Active", health.get("agents", 5))
+            st.metric("RAG Enabled", str(health.get("rag", False)))
+        except Exception:
+            st.error("Backend not connected. Start FastAPI first.")
+
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Workflows", "12")
+        col2.metric("Reports", "8")
+        col3.metric("Quality Score", "8.5/10")
+        col4.metric("Knowledge Docs", "1")
+
+        st.markdown("---")
+        st.subheader("Recent Activity")
+        st.info("Recent workflow runs and document Q&A history will appear here.")
+
+    elif page == "📚 Knowledge Base":
+        st.title("📚 Knowledge Base")
+        st.caption("Upload documents and ask grounded questions using Synaptica RAG.")
+
+        uploaded_file = st.file_uploader(
+            "Upload a PDF document",
+            type=["pdf"],
+        )
+
+        if uploaded_file is not None:
+            if st.button("Upload & Index PDF", type="primary"):
+                with st.spinner("Uploading and indexing document..."):
+                    try:
+                        files = {
+                            "file": (
+                                uploaded_file.name,
+                                uploaded_file.getvalue(),
+                                "application/pdf",
+                            )
+                        }
+
+                        response = requests.post(
+                            f"{API_URL}/upload-pdf",
+                            files=files,
+                            timeout=300,
+                        )
+
+                        if response.status_code == 200:
+                            data = response.json()
+                            st.success(
+                                f"Uploaded {data['filename']} | "
+                                f"Characters: {data['characters_extracted']} | "
+                                f"Chunks stored: {data['chunks_stored']}"
+                            )
+                        else:
+                            st.error(response.text)
+
+                    except Exception as e:
+                        st.error(str(e))
+
+        st.markdown("---")
+
+        st.subheader("Ask your document")
+
+        question = st.text_input(
+            "Question",
+            placeholder="Example: What is this document about?",
+        )
+
+        if st.button("Ask Synaptica RAG"):
+            if not question.strip():
+                st.warning("Please enter a question.")
+            else:
+                with st.spinner("Searching knowledge base and generating answer..."):
+                    try:
+                        response = requests.post(
+                            f"{API_URL}/ask-docs",
+                            json={"question": question},
+                            timeout=300,
+                        )
+
+                        if response.status_code == 200:
+                            data = response.json()["result"]
+
+                            st.success("Answer generated")
+
+                            st.markdown("### Answer")
+                            st.write(data["answer"])
+
+                            st.markdown("### Sources")
+                            st.json(data["sources"])
+
+                        else:
+                            st.error(response.text)
+
+                    except Exception as e:
+                        st.error(str(e))
+
+    elif page == "🤖 Agent Studio":
+        st.title("🤖 Agent Studio")
+
+        agents = [
+            ("Planner Agent", "Plans and decomposes user tasks"),
+            ("Research Agent", "Finds and analyzes information"),
+            ("RAG Agent", "Answers using uploaded documents"),
+            ("Validator Agent", "Checks factual grounding"),
+            ("Critic Agent", "Reviews and improves outputs"),
+        ]
+
+        for name, role in agents:
+            st.markdown(
+                f"""
+                <div class="card">
+                    <h3>{name}</h3>
+                    <p>{role}</p>
+                    <p><b>Status:</b> Active</p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            st.write("")
+
+    elif page == "⚡ Workflows":
+        st.title("⚡ Run Agent Workflow")
+
+        task = st.text_area(
+            "Enter task",
+            value="Launch Synaptica AI Platform",
+            height=120,
+        )
+
+        if st.button("Execute Workflow", type="primary"):
+            with st.spinner("Running multi-agent workflow..."):
+                try:
+                    response = requests.post(
+                        f"{API_URL}/execute",
+                        json={"task": task, "context": {}},
+                        timeout=300,
+                    )
+
+                    if response.status_code == 200:
+                        data = response.json()
+                        st.success(f"Completed in {data['execution_time']} seconds")
+                        result = data["result"]
+
+                        st.subheader("Final Report")
+                        st.markdown(result["synthesized"]["final_plan"])
+
+                        st.subheader("Agent Results")
+                        st.json(result["results"])
+                    else:
+                        st.error(response.text)
+
+                except Exception as e:
+                    st.error(str(e))
+
+    elif page == "📊 Analytics":
+        st.title("📊 Analytics")
+        st.info("Latency, quality score, grounding score, and agent performance charts will appear here.")
+
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Avg Latency", "4.2s")
+        col2.metric("Grounding Score", "8.6/10")
+        col3.metric("Success Rate", "92%")
+
+    elif page == "📄 Reports":
+        st.title("📄 Reports")
+        st.info("Generated workflow and RAG reports will appear here.")
+
+    elif page == "⚙️ Settings":
+        st.title("⚙️ Settings")
+        st.write("Profile, theme, API keys, and workspace settings will appear here.")
+
+
+if not st.session_state.logged_in:
+    if st.session_state.page == "Login":
+        login_page()
     else:
-        with st.spinner("Running 5-agent collaboration..."):
-            try:
-                response = requests.post(
-                    f"{API_URL}/execute",
-                    json={
-                        "task": task_input,
-                        "context": {},
-                    },
-                    timeout=300,
-                )
-
-                if response.status_code == 200:
-                    data = response.json()
-
-                    st.success(f"Task completed in {data['execution_time']} seconds")
-
-                    result = data["result"]
-
-                    st.subheader("🧩 Subtasks")
-                    st.json(result["subtasks"])
-
-                    st.subheader("🤖 Agent Results")
-
-                    results = result["results"]
-
-                    col1, col2 = st.columns(2)
-
-                    with col1:
-                        st.markdown("### 🔍 Market Researcher")
-                        st.json(results["market_researcher"]["result"])
-
-                        st.markdown("### 📅 Timeline Planner")
-                        st.json(results["timeline_planner"]["result"])
-
-                        st.markdown("### 💰 Budget Optimizer")
-                        st.json(results["budget_optimizer"]["result"])
-
-                    with col2:
-                        st.markdown("### ✍️ Content Creator")
-                        st.json(results["content_creator"]["result"])
-
-                        st.markdown("### ⚠️ Risk Analyst")
-                        st.json(results["risk_analyst"]["result"])
-
-                    st.subheader("🎯 Final Synthesized Plan")
-                    st.markdown(result["synthesized"]["final_plan"])
-
-                    st.subheader("📈 Orchestrator Critique")
-                    st.json(result["critique"])
-
-                else:
-                    st.error(f"API Error: {response.status_code}")
-                    st.code(response.text)
-
-            except Exception as e:
-                st.error("Could not connect to backend.")
-                st.code(str(e))
-
-st.markdown("---")
-st.caption("Built by Shriya Shinde | Synaptica AI Platform")
+        landing_page()
+else:
+    dashboard_page()
