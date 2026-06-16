@@ -55,28 +55,25 @@ def landing_page():
     )
 
     st.write("")
-
     col1, col2, col3 = st.columns(3)
 
     with col1:
         st.markdown(
-            '<div class="card"><h3>🤖 Multi-Agent AI</h3><p>Specialized agents collaborate to plan, research, analyze, and synthesize outputs.</p></div>',
+            '<div class="card"><h3>🤖 Multi-Agent AI</h3><p>Specialized agents collaborate for research, planning, and execution.</p></div>',
             unsafe_allow_html=True,
         )
 
     with col2:
         st.markdown(
-            '<div class="card"><h3>📚 Document Intelligence</h3><p>Upload PDFs, index them, and ask grounded questions using RAG.</p></div>',
+            '<div class="card"><h3>📚 Multi-Document RAG</h3><p>Upload PDFs, create separate knowledge bases, and ask grounded questions.</p></div>',
             unsafe_allow_html=True,
         )
 
     with col3:
         st.markdown(
-            '<div class="card"><h3>📄 Reports</h3><p>Generate structured execution reports from agent workflows and document context.</p></div>',
+            '<div class="card"><h3>📄 Persistent Reports</h3><p>Save document Q&A history and generate structured outputs.</p></div>',
             unsafe_allow_html=True,
         )
-
-    st.write("")
 
     if st.button("Get Started", type="primary"):
         st.session_state.page = "Login"
@@ -141,70 +138,83 @@ def dashboard_page():
         col1.metric("Workflows", "12")
         col2.metric("Reports", "8")
         col3.metric("Quality Score", "8.5/10")
-        col4.metric("Knowledge Docs", "1")
-
-        st.markdown("---")
-        st.subheader("Recent Activity")
-        st.info("Recent workflow runs and document Q&A history will appear here.")
+        col4.metric("Knowledge Bases", "Multi-PDF")
 
     elif page == "📚 Knowledge Base":
         st.title("📚 Knowledge Base")
-        st.caption("Upload documents and ask grounded questions using Synaptica RAG.")
+        st.caption("Upload PDFs, create separate knowledge bases, and chat with selected documents.")
 
-        uploaded_file = st.file_uploader(
-            "Upload a PDF document",
-            type=["pdf"],
-        )
+        uploaded_file = st.file_uploader("Upload a PDF document", type=["pdf"])
 
         if uploaded_file is not None:
             if st.button("Upload & Index PDF", type="primary"):
                 with st.spinner("Uploading and indexing document..."):
-                    try:
-                        files = {
-                            "file": (
-                                uploaded_file.name,
-                                uploaded_file.getvalue(),
-                                "application/pdf",
-                            )
-                        }
-
-                        response = requests.post(
-                            f"{API_URL}/upload-pdf",
-                            files=files,
-                            timeout=300,
+                    files = {
+                        "file": (
+                            uploaded_file.name,
+                            uploaded_file.getvalue(),
+                            "application/pdf",
                         )
+                    }
 
-                        if response.status_code == 200:
-                            data = response.json()
-                            st.success(
-                                f"Uploaded {data['filename']} | "
-                                f"Characters: {data['characters_extracted']} | "
-                                f"Chunks stored: {data['chunks_stored']}"
-                            )
-                        else:
-                            st.error(response.text)
+                    response = requests.post(
+                        f"{API_URL}/upload-pdf",
+                        files=files,
+                        timeout=300,
+                    )
 
-                    except Exception as e:
-                        st.error(str(e))
+                    if response.status_code == 200:
+                        data = response.json()
+                        st.success(
+                            f"Uploaded {data['filename']} | "
+                            f"Chunks: {data['chunks_stored']} | "
+                            f"Collection: {data['collection_name']}"
+                        )
+                        st.json(data)
+                    else:
+                        st.error(response.text)
 
         st.markdown("---")
+        st.subheader("Available Knowledge Bases")
 
-        st.subheader("Ask your document")
+        collections = []
 
-        question = st.text_input(
-            "Question",
-            placeholder="Example: What is this document about?",
-        )
+        try:
+            response = requests.get(f"{API_URL}/knowledge-bases", timeout=10)
 
-        if st.button("Ask Synaptica RAG"):
-            if not question.strip():
-                st.warning("Please enter a question.")
+            if response.status_code == 200:
+                collections = response.json().get("collections", [])
             else:
-                with st.spinner("Searching knowledge base and generating answer..."):
-                    try:
+                st.error(response.text)
+
+        except Exception as e:
+            st.error(str(e))
+
+        if collections:
+            selected_collection = st.selectbox(
+                "Select a knowledge base",
+                collections,
+            )
+
+            st.markdown("---")
+            st.subheader("Ask Selected Document")
+
+            question = st.text_input(
+                "Question",
+                placeholder="Example: What is this document about?",
+            )
+
+            if st.button("Ask Synaptica RAG", type="primary"):
+                if not question.strip():
+                    st.warning("Please enter a question.")
+                else:
+                    with st.spinner("Searching selected document and generating answer..."):
                         response = requests.post(
                             f"{API_URL}/ask-docs",
-                            json={"question": question},
+                            json={
+                                "question": question,
+                                "collection_name": selected_collection,
+                            },
                             timeout=300,
                         )
 
@@ -221,9 +231,37 @@ def dashboard_page():
 
                         else:
                             st.error(response.text)
+        else:
+            st.info("No knowledge bases found. Upload a PDF first.")
 
-                    except Exception as e:
-                        st.error(str(e))
+        st.markdown("---")
+        st.subheader("Persistent Chat History")
+
+        try:
+            history_response = requests.get(f"{API_URL}/rag-history", timeout=10)
+            history = history_response.json().get("history", [])
+
+            if history:
+                if st.button("Clear Persistent History"):
+                    delete_response = requests.delete(
+                        f"{API_URL}/rag-history",
+                        timeout=10,
+                    )
+
+                    if delete_response.status_code == 200:
+                        st.success("History cleared")
+                        st.rerun()
+
+                for chat in reversed(history):
+                    with st.expander(f"{chat['collection']} | {chat['question']}"):
+                        st.caption(chat["timestamp"])
+                        st.write(chat["answer"])
+                        st.json(chat["sources"])
+            else:
+                st.info("No persistent document chat history yet.")
+
+        except Exception as e:
+            st.error(str(e))
 
     elif page == "🤖 Agent Studio":
         st.title("🤖 Agent Studio")
@@ -231,7 +269,7 @@ def dashboard_page():
         agents = [
             ("Planner Agent", "Plans and decomposes user tasks"),
             ("Research Agent", "Finds and analyzes information"),
-            ("RAG Agent", "Answers using uploaded documents"),
+            ("RAG Agent", "Answers using selected document knowledge bases"),
             ("Validator Agent", "Checks factual grounding"),
             ("Critic Agent", "Reviews and improves outputs"),
         ]
@@ -260,37 +298,34 @@ def dashboard_page():
 
         if st.button("Execute Workflow", type="primary"):
             with st.spinner("Running multi-agent workflow..."):
-                try:
-                    response = requests.post(
-                        f"{API_URL}/execute",
-                        json={"task": task, "context": {}},
-                        timeout=300,
-                    )
+                response = requests.post(
+                    f"{API_URL}/execute",
+                    json={"task": task, "context": {}},
+                    timeout=300,
+                )
 
-                    if response.status_code == 200:
-                        data = response.json()
-                        st.success(f"Completed in {data['execution_time']} seconds")
-                        result = data["result"]
+                if response.status_code == 200:
+                    data = response.json()
+                    st.success(f"Completed in {data['execution_time']} seconds")
+                    result = data["result"]
 
-                        st.subheader("Final Report")
-                        st.markdown(result["synthesized"]["final_plan"])
+                    st.subheader("Final Report")
+                    st.markdown(result["synthesized"]["final_plan"])
 
-                        st.subheader("Agent Results")
-                        st.json(result["results"])
-                    else:
-                        st.error(response.text)
-
-                except Exception as e:
-                    st.error(str(e))
+                    st.subheader("Agent Results")
+                    st.json(result["results"])
+                else:
+                    st.error(response.text)
 
     elif page == "📊 Analytics":
         st.title("📊 Analytics")
-        st.info("Latency, quality score, grounding score, and agent performance charts will appear here.")
 
         col1, col2, col3 = st.columns(3)
         col1.metric("Avg Latency", "4.2s")
         col2.metric("Grounding Score", "8.6/10")
         col3.metric("Success Rate", "92%")
+
+        st.info("Real analytics will be connected after task history storage is added.")
 
     elif page == "📄 Reports":
         st.title("📄 Reports")

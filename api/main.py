@@ -1,5 +1,6 @@
 """
 Synaptica API - FastAPI Endpoints
+Multi-agent workflow + multi-document RAG + persistent history
 """
 
 import os
@@ -12,14 +13,15 @@ from pydantic import BaseModel
 
 from agents.orchestrator import Orchestrator
 from knowledge.ingest import extract_pdf_text, chunk_text
-from knowledge.vector_store import add_chunks_to_chroma
+from knowledge.vector_store import add_chunks_to_chroma, list_collections
 from knowledge.retriever import answer_from_docs
+from knowledge.history import load_history, save_history_item, clear_history
 
 
 app = FastAPI(
     title="Synaptica API",
-    description="Multi-Agent AI Platform with RAG",
-    version="2.0.0",
+    description="Multi-Agent AI Platform with Multi-Document RAG",
+    version="2.2.0",
 )
 
 app.add_middleware(
@@ -46,13 +48,14 @@ class TaskResponse(BaseModel):
 
 class AskDocsRequest(BaseModel):
     question: str
+    collection_name: str
 
 
 @app.get("/")
 async def root():
     return {
         "name": "Synaptica API",
-        "version": "2.0.0",
+        "version": "2.2.0",
         "status": "running",
     }
 
@@ -63,6 +66,8 @@ async def health_check():
         "status": "healthy",
         "agents": 5,
         "rag": True,
+        "multi_document_rag": True,
+        "persistent_history": True,
     }
 
 
@@ -79,13 +84,34 @@ async def list_agents():
     }
 
 
+@app.get("/knowledge-bases")
+async def knowledge_bases():
+    return {
+        "collections": list_collections()
+    }
+
+
+@app.get("/rag-history")
+async def rag_history():
+    return {
+        "history": load_history()
+    }
+
+
+@app.delete("/rag-history")
+async def delete_rag_history():
+    clear_history()
+    return {
+        "success": True,
+        "message": "RAG history cleared",
+    }
+
+
 @app.post("/execute", response_model=TaskResponse)
 async def execute_task(request: TaskRequest):
     try:
         start_time = time.time()
-
         result = await orchestrator.execute_task(request.task)
-
         execution_time = time.time() - start_time
 
         return TaskResponse(
@@ -118,7 +144,7 @@ async def upload_pdf(file: UploadFile = File(...)):
 
         chunks = chunk_text(text)
 
-        count = add_chunks_to_chroma(
+        result = add_chunks_to_chroma(
             chunks,
             source_name=file.filename,
         )
@@ -127,7 +153,8 @@ async def upload_pdf(file: UploadFile = File(...)):
             "success": True,
             "filename": file.filename,
             "characters_extracted": len(text),
-            "chunks_stored": count,
+            "chunks_stored": result["chunks_stored"],
+            "collection_name": result["collection_name"],
         }
 
     except Exception as e:
@@ -137,7 +164,17 @@ async def upload_pdf(file: UploadFile = File(...)):
 @app.post("/ask-docs")
 async def ask_docs(request: AskDocsRequest):
     try:
-        result = await answer_from_docs(request.question)
+        result = await answer_from_docs(
+            question=request.question,
+            collection_name=request.collection_name,
+        )
+
+        save_history_item(
+            collection=request.collection_name,
+            question=request.question,
+            answer=result["answer"],
+            sources=result["sources"],
+        )
 
         return {
             "success": True,
