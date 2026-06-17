@@ -1,6 +1,6 @@
 """
 Synaptica API - FastAPI Endpoints
-Multi-agent workflow + multi-document RAG + persistent history
+Multi-agent workflow + multi-document RAG + persistent history + reports
 """
 
 import os
@@ -16,12 +16,13 @@ from knowledge.ingest import extract_pdf_text, chunk_text
 from knowledge.vector_store import add_chunks_to_chroma, list_collections
 from knowledge.retriever import answer_from_docs
 from knowledge.history import load_history, save_history_item, clear_history
+from knowledge.reports import load_reports, save_report, clear_reports
 
 
 app = FastAPI(
     title="Synaptica API",
     description="Multi-Agent AI Platform with Multi-Document RAG",
-    version="2.2.0",
+    version="2.3.0",
 )
 
 app.add_middleware(
@@ -51,11 +52,17 @@ class AskDocsRequest(BaseModel):
     collection_name: str
 
 
+class ReportRequest(BaseModel):
+    title: str
+    content: str
+    source_type: str = "rag"
+
+
 @app.get("/")
 async def root():
     return {
         "name": "Synaptica API",
-        "version": "2.2.0",
+        "version": "2.3.0",
         "status": "running",
     }
 
@@ -68,6 +75,7 @@ async def health_check():
         "rag": True,
         "multi_document_rag": True,
         "persistent_history": True,
+        "reports": True,
     }
 
 
@@ -104,6 +112,36 @@ async def delete_rag_history():
     return {
         "success": True,
         "message": "RAG history cleared",
+    }
+
+
+@app.get("/reports")
+async def get_reports():
+    return {
+        "reports": load_reports()
+    }
+
+
+@app.post("/reports")
+async def create_report(request: ReportRequest):
+    report = save_report(
+        title=request.title,
+        content=request.content,
+        source_type=request.source_type,
+    )
+
+    return {
+        "success": True,
+        "report": report,
+    }
+
+
+@app.delete("/reports")
+async def delete_reports():
+    clear_reports()
+    return {
+        "success": True,
+        "message": "Reports cleared",
     }
 
 

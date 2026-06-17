@@ -329,7 +329,16 @@ def dashboard_page():
 
     elif page == "📄 Reports":
         st.title("📄 Reports")
-        st.info("Generated workflow and RAG reports will appear here.")
+        st.caption("Saved Synaptica reports from RAG and workflows.")
+
+        st.info("Reports feature will be connected in the next phase.")
+
+        st.markdown("### Planned Report Features")
+        st.write("- Save RAG answers as reports")
+        st.write("- Save workflow execution reports")
+        st.write("- Export reports as Markdown")
+        st.write("- Export reports as PDF")
+        st.write("- View report history")
 
     elif page == "⚙️ Settings":
         st.title("⚙️ Settings")
